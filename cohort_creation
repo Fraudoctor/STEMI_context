@@ -4,6 +4,10 @@ FROM
       op.jc_uid, op.pat_enc_csn_id_coded,
       admit.event_type, admit.pat_class, admit.effective_time_jittered as emergencyAdmitTime, 
       inpatient.pat_class as inptClass, min(inpatient.effective_time_jittered) as inpatientAdmitTime,
+      --min(opCT.order_inst_jittered) as ctHeadOrderTime,
+      --om.med_description as tpaDescription, 
+      --min(om.order_time_jittered) as tpaOrderTime,
+      --min(mar.taken_time_jittered) as tpaAdminTime,
     from
       `mining-clinical-decisions.starr_datalake2018.order_proc` as op, 
       `mining-clinical-decisions.starr_datalake2018.adt` as admit, 
