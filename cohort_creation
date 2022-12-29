@@ -4,7 +4,7 @@ FROM
       op.jc_uid, op.pat_enc_csn_id_coded,
       admit.event_type, admit.pat_class, admit.effective_time_jittered as emergencyAdmitTime, 
       inpatient.pat_class as inptClass, min(inpatient.effective_time_jittered) as inpatientAdmitTime,
-      --min(opCT.order_inst_jittered) as ctHeadOrderTime,
+      min(op.order_inst_jittered) as cathOrderTime,
       --om.med_description as tpaDescription, 
       --min(om.order_time_jittered) as tpaOrderTime,
       --min(mar.taken_time_jittered) as tpaAdminTime,
