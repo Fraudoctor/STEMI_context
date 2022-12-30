@@ -8,6 +8,8 @@ FROM
       --om.med_description as tpaDescription, 
       --min(om.order_time_jittered) as tpaOrderTime,
       --min(mar.taken_time_jittered) as tpaAdminTime,
+      -- adt department_id = 1107301000 is cath lab and can use effective time as the arrival to cath time
+
     from
       `mining-clinical-decisions.starr_datalake2018.order_proc` as op, 
       `mining-clinical-decisions.starr_datalake2018.adt` as admit, 
