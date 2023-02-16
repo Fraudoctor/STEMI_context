@@ -31,11 +31,8 @@ FROM
       and dx.icd10 in ('I21.11', 'I21.19', 'I21.21', 'I21.01', 'I21.02', 'I21.09', 'I21.21', 'I21.3')
       and (UPPER(op.description) LIKE '%CATH%' OR UPPER(op.description) LIKE '%ANGIO%')
       and inpatient.pat_class_c = '126' -- Inpatient
-      and admit_cath.department_id in (1107301000, 9991111, 120201028) -- Went to cath lab. These have not recently changed in Epic.
-STANFORD HOSPITAL CATH LAB [110730]
-STANFORD HOSPITAL 500P INTERVENTIONAL PLATFORM [110600]
-Thanks,
-MeghanLimited cases to 145 from 569 cases in this setting. 2000251 = D1CC, 2000254 = D1CS, 2000255 = ICU, 
+      and admit_cath.department_id in (1107301000, 9991111, 120201028) -- Went to cath lab. These have not recently changed in Epic. STANFORD HOSPITAL CATH LAB [110730]
+STANFORD HOSPITAL 500P INTERVENTIONAL PLATFORM [110600] Limited cases to 145 from 569 cases in this setting. 2000251 = D1CC, 2000254 = D1CS, 2000255 = ICU, 
     group by 
       op.jc_uid, op.pat_enc_csn_id_coded, 
       admit.event_type, admit.pat_class, admit.effective_time_jittered, 
