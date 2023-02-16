@@ -1,0 +1,43 @@
+-- This code is for using SHC core instead of Data Lake
+
+Select *
+FROM
+(select 
+      op.anon_id, op.pat_enc_csn_id_coded,
+      admit.event_type, admit.pat_class, admit.effective_time_jittered as emergencyAdmitTime, 
+      inpatient.pat_class as inptClass, min(inpatient.effective_time_jittered) as inpatientAdmitTime,
+      min(admit_cath.effective_time_jittered) as cathTime,
+      --om.med_description as tpaDescription, 
+      --min(om.order_time_jittered) as tpaOrderTime,
+      --min(mar.taken_time_jittered) as tpaAdminTime,
+      -- adt department_id = 1107301000 is cath lab and can use effective time as the arrival to cath time
+
+    from
+      `mining-clinical-decisions.shc_core.order_proc` as op, 
+      `mining-clinical-decisions.shc_core.adt` as admit, 
+      `mining-clinical-decisions.shc_core.diagnosis_code` dx,
+      `mining-clinical-decisions.shc_core.adt` as inpatient,
+      `mining-clinical-decisions.shc_core.encounter` as enc,
+      `mining-clinical-decisions.shc_core.adt` as admit_cath 
+      
+    where
+      op.pat_enc_csn_id_coded = admit.pat_enc_csn_id_coded
+      and dx.pat_enc_csn_id_jittered = admit.pat_enc_csn_id_coded
+      and op.pat_enc_csn_id_coded = inpatient.pat_enc_csn_id_coded
+      and op.pat_enc_csn_id_coded = enc.pat_enc_csn_id_coded
+      and op.pat_enc_csn_id_coded = admit_cath.pat_enc_csn_id_coded
+      and admit.event_type_c = 1 -- Admission
+      and admit.pat_class_c = '112' -- Emergency Services
+    
+      and dx.primary = 'Y'
+      and (dx.icd10 in ('I21.11', 'I21.19', 'I21.21', 'I21.01', 'I21.02', 'I21.09', 'I21.21', 'I21.3') OR dx.icd9 in ('410.21', '410.31', '410.41', '410.01', '410.11', '410.51', '410.61', '410.81', '410.91'))
+      and (UPPER(op.description) LIKE '%CATH%' OR UPPER(op.description) LIKE '%ANGIO%')
+      and inpatient.pat_class_c = '126' -- Inpatient
+      and admit_cath.department_id in (1107301000, 9991111, 120201028) -- Went to cath lab. These have not recently changed in Epic. STANFORD HOSPITAL CATH LAB [110730] STANFORD HOSPITAL 500P INTERVENTIONAL PLATFORM [110600] Limited cases to 145 from 569 cases in this setting. 2000251 = D1CC, 2000254 = D1CS, 2000255 = ICU, 
+    group by 
+      op.anon_id, op.pat_enc_csn_id_coded, 
+      admit.event_type, admit.pat_class, admit.effective_time_jittered, 
+      inpatient.pat_class
+    HAVING (TIMESTAMP_DIFF(MIN(admit_cath.effective_time_jittered), admit.effective_time_jittered, HOUR) < 24) -- AND inpatientAdmitTime = cathTime) -- This gets us people who went DIRECTLY to cath lab for sure.
+    order by emergencyAdmitTime
+)
