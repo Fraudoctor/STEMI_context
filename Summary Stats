@@ -1,0 +1,112 @@
+-- Summary Statistics
+-- 50 most common meds
+SELECT mm.MEDICATION_ID, mm.MEDICATION_NAME, COUNT(DISTINCT om.pat_enc_csn_id_coded) AS num_patients
+FROM `mining-clinical-decisions.shc_core.order_med` AS om
+JOIN `mining-clinical-decisions.shc_core.diagnosis_code` AS dc
+ON om.pat_enc_csn_id_coded = dc.pat_enc_csn_id_jittered
+JOIN `mining-clinical-decisions.shc_core.mapped_meds` AS mm
+ON om.medication_id = mm.MEDICATION_ID
+JOIN `mining-clinical-decisions.shc_core.adt` AS a
+ON om.pat_enc_csn_id_coded = a.pat_enc_csn_id_coded
+WHERE dc.icd10 IN ('I21.11', 'I21.19', 'I21.21', 'I21.01', 'I21.02', 'I21.09', 'I21.21', 'I21.3') AND dc.primary = 'Y' AND a.department_id IN (1107301000, 9991111, 120201028)
+GROUP BY mm.MEDICATION_ID, mm.MEDICATION_NAME
+ORDER BY num_patients DESC
+LIMIT 50
+
+-- 50 most common orders
+SELECT op.proc_code, op.description, COUNT(DISTINCT op.pat_enc_csn_id_coded) AS num_patients
+FROM `mining-clinical-decisions.shc_core.order_proc` AS op
+JOIN (
+  SELECT pat_enc_csn_id_coded
+  FROM `mining-clinical-decisions.shc_core.diagnosis_code` AS dx
+  JOIN `mining-clinical-decisions.shc_core.adt` AS inpatient
+  ON dx.pat_enc_csn_id_jittered = inpatient.pat_enc_csn_id_coded
+  WHERE dx.icd10 IN ('I21.11', 'I21.19', 'I21.21', 'I21.01', 'I21.02', 'I21.09', 'I21.21', 'I21.3')
+  AND dx.primary = 'Y'
+  AND inpatient.department_id IN (1107301000, 9991111, 120201028)
+) AS patients
+ON op.pat_enc_csn_id_coded = patients.pat_enc_csn_id_coded
+GROUP BY op.proc_code, op.description
+ORDER BY num_patients DESC
+LIMIT 50
+
+-- 50 Orders While in Cath Lab
+SELECT op.proc_code, op.description, COUNT(DISTINCT op.pat_enc_csn_id_coded) AS num_patients
+FROM `mining-clinical-decisions.shc_core.order_proc` AS op
+JOIN (
+  SELECT pat_enc_csn_id_coded, effective_time_jittered AS admit_time
+  FROM `mining-clinical-decisions.shc_core.adt`
+  WHERE department_id IN (1107301000, 9991111, 120201028) AND event_type = 'Transfer In'
+) AS admit
+ON op.pat_enc_csn_id_coded = admit.pat_enc_csn_id_coded
+JOIN (
+  SELECT pat_enc_csn_id_coded, effective_time_jittered AS discharge_time
+  FROM `mining-clinical-decisions.shc_core.adt`
+  WHERE department_id IN (1107301000, 9991111, 120201028) AND event_type = 'Transfer Out'
+) AS discharge
+ON op.pat_enc_csn_id_coded = discharge.pat_enc_csn_id_coded
+WHERE op.pat_enc_csn_id_coded IN (
+  SELECT DISTINCT inpatient.pat_enc_csn_id_coded
+  FROM `mining-clinical-decisions.shc_core.diagnosis_code` AS dx
+  JOIN `mining-clinical-decisions.shc_core.adt` AS inpatient
+  ON dx.pat_enc_csn_id_jittered = inpatient.pat_enc_csn_id_coded
+  WHERE dx.icd10 IN ('I21.11', 'I21.19', 'I21.21', 'I21.01', 'I21.02', 'I21.09', 'I21.21', 'I21.3')
+  AND dx.primary = 'Y'
+)
+AND op.instantiated_time_jittered >= admit.admit_time
+AND op.instantiated_time_jittered <= discharge.discharge_time
+GROUP BY op.proc_code, op.description
+ORDER BY num_patients DESC
+LIMIT 50
+
+-- 50 Meds while in cath
+SELECT 
+  mm.MEDICATION_ID, 
+  mm.MEDICATION_NAME, 
+  COUNT(DISTINCT om.pat_enc_csn_id_coded) AS num_patients
+FROM 
+  `mining-clinical-decisions.shc_core.order_med` AS om
+JOIN 
+  `mining-clinical-decisions.shc_core.mapped_meds` AS mm 
+  ON om.medication_id = mm.MEDICATION_ID
+JOIN (
+  SELECT 
+    pat_enc_csn_id_coded, 
+    effective_time_jittered AS admit_time
+  FROM 
+    `mining-clinical-decisions.shc_core.adt`
+  WHERE 
+    department_id IN (1107301000, 9991111, 120201028) AND event_type = 'Transfer In'
+) AS admit
+  ON om.pat_enc_csn_id_coded = admit.pat_enc_csn_id_coded
+JOIN (
+  SELECT 
+    pat_enc_csn_id_coded, 
+    effective_time_jittered AS discharge_time
+  FROM 
+    `mining-clinical-decisions.shc_core.adt`
+  WHERE 
+    department_id IN (1107301000, 9991111, 120201028) AND event_type = 'Transfer Out'
+) AS discharge
+  ON om.pat_enc_csn_id_coded = discharge.pat_enc_csn_id_coded
+WHERE 
+  om.pat_enc_csn_id_coded IN (
+    SELECT DISTINCT inpatient.pat_enc_csn_id_coded
+    FROM 
+      `mining-clinical-decisions.shc_core.diagnosis_code` AS dx
+    JOIN 
+      `mining-clinical-decisions.shc_core.adt` AS inpatient
+      ON dx.pat_enc_csn_id_jittered = inpatient.pat_enc_csn_id_coded
+    WHERE 
+      dx.icd10 IN ('I21.11', 'I21.19', 'I21.21', 'I21.01', 'I21.02', 'I21.09', 'I21.21', 'I21.3')
+      AND dx.primary = 'Y'
+  )
+  AND om.order_time_jittered >= admit.admit_time
+  AND om.order_time_jittered <= discharge.discharge_time
+GROUP BY 
+  mm.MEDICATION_ID, 
+  mm.MEDICATION_NAME
+ORDER BY 
+  num_patients DESC
+LIMIT 
+  50
