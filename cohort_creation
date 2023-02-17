@@ -36,6 +36,6 @@ FROM
       op.jc_uid, op.pat_enc_csn_id_coded, 
       admit.event_type, admit.pat_class, admit.effective_time_jittered, 
       inpatient.pat_class
-    HAVING (TIMESTAMP_DIFF(MIN(admit_cath.effective_time_jittered), admit.effective_time_jittered, HOUR) < 24 AND inpatientAdmitTime = cathTime) -- This gets us people who went DIRECTLY to cath lab for sure.
+    HAVING (TIMESTAMP_DIFF(MIN(admit_cath.effective_time_jittered), admit.effective_time_jittered, HOUR) < 24) -- AND inpatientAdmitTime = cathTime) -- This gets us people who went DIRECTLY to cath lab for sure.
     order by emergencyAdmitTime
 )
