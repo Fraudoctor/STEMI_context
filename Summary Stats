@@ -110,3 +110,40 @@ ORDER BY
   num_patients DESC
 LIMIT 
   50
+
+--Average time to Cath by team member and number of encounters they have had
+WITH ed_admission AS (
+  SELECT pat_enc_csn_id_coded, MIN(effective_time_jittered) AS ed_admit_time
+  FROM `mining-clinical-decisions.shc_core.adt`
+  WHERE department_id = 2001002 AND event_type = 'Admission'
+  GROUP BY pat_enc_csn_id_coded
+), transfer_to_dept AS (
+  SELECT adt.pat_enc_csn_id_coded, adt.department_id, MIN(adt.effective_time_jittered) AS transfer_time
+  FROM `mining-clinical-decisions.shc_core.adt` AS adt
+  JOIN `mining-clinical-decisions.shc_core.treatment_team` AS team ON adt.pat_enc_csn_id_coded = team.pat_enc_csn_id_coded
+  WHERE adt.event_type = 'Transfer In'
+  AND adt.department_id IN (1107301000, 9991111, 120201028)
+  GROUP BY adt.pat_enc_csn_id_coded, adt.department_id
+), ed_to_dept_transfer AS (
+  SELECT ed.pat_enc_csn_id_coded, transfer.department_id,
+    TIMESTAMP_DIFF(transfer.transfer_time, ed.ed_admit_time, MINUTE) AS time_diff_minutes
+  FROM ed_admission AS ed
+  JOIN transfer_to_dept AS transfer ON ed.pat_enc_csn_id_coded = transfer.pat_enc_csn_id_coded
+), median_time_and_count_by_team_member AS (
+  SELECT team.prov_map_id, team.name, transfer.department_id, 
+    APPROX_QUANTILES(time_diff_minutes, 2)[OFFSET(1)] AS median_time_to_dept,
+    COUNT(DISTINCT team.pat_enc_csn_id_coded) as encounter_count
+  FROM `mining-clinical-decisions.shc_core.treatment_team` AS team
+  JOIN ed_to_dept_transfer AS transfer ON team.pat_enc_csn_id_coded = transfer.pat_enc_csn_id_coded
+  JOIN ed_admission AS ed ON team.pat_enc_csn_id_coded = ed.pat_enc_csn_id_coded
+  JOIN transfer_to_dept AS ttd ON team.pat_enc_csn_id_coded = ttd.pat_enc_csn_id_coded
+    AND team.trtmnt_tm_begin_dt_jittered >= ed.ed_admit_time 
+    AND team.trtmnt_tm_begin_dt_jittered <= ttd.transfer_time
+  GROUP BY team.prov_map_id, team.name, transfer.department_id
+)
+
+SELECT prov_map_id, name, 
+  IFNULL(median_time_to_dept, 0) AS median_time_to_dept,
+  IFNULL(encounter_count, 0) AS encounter_count
+FROM median_time_and_count_by_team_member
+ORDER BY median_time_to_dept
